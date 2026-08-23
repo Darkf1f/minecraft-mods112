@@ -1,0 +1,139 @@
+package com.df.mobvisualizer;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/**
+ * Persistent client-side settings. Colors are ARGB hex values.
+ */
+public final class MobOverlayConfig {
+    public int purpleIdLimit = 10_000;
+    /**
+     * Chunk rules are checked from left to right. The first matching rule
+     * marks the chunk and supplies its color. Examples:
+     * id<50=#C855E8FF;id<10000=#FF7A0000;percent<5=#FFFF2020
+     */
+    public boolean markOnlyRuleChunks = true;
+    public String chunkColorRules =
+            "id<50=#C855E8FF;id<10000=#FF7A0000;"
+                    + "percent<5=#FF7A0000;percent<20=#FFFF2020;"
+                    + "percent<30=#FFFF7A00;percent<50=#FFFFB000";
+    /** Safe mode: no entity scan, glow, HUD or chunk rendering until enabled. */
+    public boolean enabled = false;
+    public double darkRedPercent = 5.0;
+    public double redPercent = 20.0;
+    public double darkOrangePercent = 30.0;
+    public double orangePercent = 50.0;
+    public double sessionPercentLimit = 15.0;
+    public double highlightPercentLimit = 15.0;
+    public double centerPercentLimit = 15.0;
+    public int scanIntervalTicks = 5;
+
+    public int purpleColor = 0xC855E8FF;
+    public int darkRedColor = 0xFF7A0000;
+    public int redColor = 0xFFFF2020;
+    public int darkOrangeColor = 0xFFFF7A00;
+    public int orangeColor = 0xFFFFB000;
+    public int alertColor = 0xFFFFD34E;
+    public int chargedCreeperColor = 0xFFB36BFF;
+
+    public boolean showHud = false;
+    public boolean showChunkOverlay = false;
+    public boolean seeThroughMobs = false;
+    public boolean highlightSessionMobs = true;
+    public boolean highlightAlertMobs = true;
+    public boolean highlightLowIds = true;
+    public boolean highlightHurtMobs = false;
+    public boolean highlightHostileMobs = true;
+    public boolean highlightPlayers = false;
+    public boolean centerAlertMobs = true;
+    public boolean centerSessionMobs = false;
+    public boolean centerLowIds = false;
+    public boolean centerHurtMobs = false;
+    public boolean centerHostileMobs = true;
+    public boolean centerPlayers = false;
+    public boolean showChunkFill = true;
+    public boolean sessionEnabled = true;
+    public boolean pinLowIds = true;
+    public boolean pinHurtMobs = true;
+    public boolean pinHostileMobs = false;
+    public boolean pinPlayers = true;
+    public boolean showPlayers = true;
+    public boolean hostileOnly = false;
+    public boolean includeOtherEntities = false;
+    public int hudSortMode = 0;
+    public int hudKey = 297;
+    public int chunksKey = 298;
+    public int mobHighlightsKey = 296;
+    public int settingsKey = 299;
+    public int clearSessionKey = 0;
+    public int clearChunksKey = 0;
+    public float hudScale = 1.0f;
+    public float hudTextScale = 1.0f;
+    public int hudWidth = 420;
+    public int hudX = 8;
+    public int hudY = 8;
+    public float chunkOpacity = 0.28f;
+    public float chunkBorderOpacity = 0.72f;
+    public double renderDistanceChunks = 12.0;
+    /** Comma-separated entity ids/types to pin in addition to the category rules. */
+    public String pinnedEntityTypes = "";
+    /** Comma-separated entity id=color pairs, e.g. minecraft:zombie=#FFFF0000. */
+    public String customMobColors = "";
+    public boolean persistSession = true;
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Path FILE = FabricLoader.getInstance().getConfigDir()
+            .resolve("df-mob-visualizer.json");
+
+    public static MobOverlayConfig load() {
+        if (!Files.exists(FILE)) return new MobOverlayConfig();
+        try (Reader reader = Files.newBufferedReader(FILE)) {
+            MobOverlayConfig config = GSON.fromJson(reader, MobOverlayConfig.class);
+            return config == null ? new MobOverlayConfig() : config;
+        } catch (Exception ignored) {
+            return new MobOverlayConfig();
+        }
+    }
+
+    public void save() {
+        try (Writer writer = Files.newBufferedWriter(FILE)) {
+            GSON.toJson(this, writer);
+        } catch (IOException ignored) {
+            // A failed config write must not stop the client render loop.
+        }
+    }
+
+    public void normalize() {
+        purpleIdLimit = Math.max(0, purpleIdLimit);
+        darkRedPercent = clampPercent(darkRedPercent);
+        redPercent = clampPercent(redPercent);
+        darkOrangePercent = clampPercent(darkOrangePercent);
+        orangePercent = clampPercent(orangePercent);
+        sessionPercentLimit = clampPercent(sessionPercentLimit);
+        highlightPercentLimit = clampPercent(highlightPercentLimit);
+        centerPercentLimit = clampPercent(centerPercentLimit);
+        scanIntervalTicks = Math.max(1, Math.min(100, scanIntervalTicks));
+        hudScale = Math.max(0.5f, Math.min(2.0f, hudScale));
+        hudTextScale = Math.max(0.5f, Math.min(2.0f, hudTextScale));
+        hudWidth = Math.max(220, Math.min(1200, hudWidth));
+        chunkOpacity = Math.max(0.0f, Math.min(1.0f, chunkOpacity));
+        chunkBorderOpacity = Math.max(0.0f, Math.min(1.0f, chunkBorderOpacity));
+        renderDistanceChunks = Math.max(1.0, Math.min(64.0, renderDistanceChunks));
+        hudX = Math.max(0, hudX);
+        hudY = Math.max(0, hudY);
+        if (pinnedEntityTypes == null) pinnedEntityTypes = "";
+        if (chunkColorRules == null) chunkColorRules = "";
+    }
+
+    private static double clampPercent(double value) {
+        return Math.max(0.0, Math.min(100.0, value));
+    }
+}
