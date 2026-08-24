@@ -49,7 +49,7 @@ public final class MobColorPickerScreen extends Screen {
         }).dimensions(left, 240, 310, 20).build());
     }
 
-    private void clearAndInit() { clearChildren(); init(); }
+    protected void clearAndInit() { clearChildren(); init(); }
 
     private void putColor() {
         StringBuilder result = new StringBuilder();
