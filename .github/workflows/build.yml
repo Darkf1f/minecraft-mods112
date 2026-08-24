@@ -19,13 +19,11 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x gradlew
-        working-directory: df-mob-visualizer-build
 
       - name: Build mod
         run: ./gradlew clean build --no-daemon --stacktrace
-        working-directory: df-mob-visualizer-build
 
       - uses: actions/upload-artifact@v4
         with:
           name: df-mob-visualizer
-          path: df-mob-visualizer-build/build/libs/*.jar
+          path: build/libs/*.jar
