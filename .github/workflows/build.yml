@@ -23,8 +23,9 @@ jobs:
 
       - name: Build mod
         run: gradle clean build --no-daemon --stacktrace
+        working-directory: df-mob-visualizer-clean-sources
 
       - uses: actions/upload-artifact@v4
         with:
           name: df-mob-visualizer
-          path: build/libs/*.jar
+          path: df-mob-visualizer-clean-sources/build/libs/*.jar
