@@ -99,7 +99,7 @@ public final class C2MEmod implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> tick(client));
         HudRenderCallback.EVENT.register((drawContext, tickDelta) -> renderHud(drawContext));
-        WorldRenderEvents.AFTER_TRANSLUCENT.register(this::renderThroughWalls);
+        WorldRenderEvents.BEFORE_ENTITIES.register(this::renderThroughWalls);
         WorldRenderEvents.AFTER_TRANSLUCENT.register(this::renderChunks);
     }
 
@@ -307,6 +307,7 @@ public final class C2MEmod implements ClientModInitializer {
 
     private void renderChunks(WorldRenderContext context) {
         if (!chunksOpen || state == null || context.consumers() == null) return;
+        
         Camera camera = context.camera();
         Vec3d cameraPos = camera.getPos();
         MinecraftClient client = MinecraftClient.getInstance();
@@ -319,8 +320,13 @@ public final class C2MEmod implements ClientModInitializer {
         
         try {
             RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
-
+            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugFilledQuads());
+            if (fills == null) {
+                fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
+            }
+            
+            Map<Long, Integer> chunkHeights = new HashMap<>();
+            
             for (ChunkMark mark : state.visibleChunks()) {
                 double centerX = mark.chunkX() * 16.0 + 8.0;
                 double centerZ = mark.chunkZ() * 16.0 + 8.0;
@@ -332,11 +338,23 @@ public final class C2MEmod implements ClientModInitializer {
                 float b = (mark.color() & 255) / 255f;
                 float alpha = config.chunkOpacity * config.chunkFillStrength;
                 alpha = Math.max(0.1f, Math.min(0.9f, alpha));
+                
                 if (mark.ring()) {
                     alpha *= 0.35f;
                 }
-                drawChunkSurface(client, fills, mark, cameraPos, r, g, b, alpha);
+                
+                long chunkKey = MobOverlayState.chunkKey(mark.chunkX(), mark.chunkZ());
+                int surfaceY = chunkHeights.computeIfAbsent(chunkKey, k -> 
+                    getChunkSurfaceHeight(client, mark.chunkX(), mark.chunkZ())
+                );
+                
+                double x = mark.chunkX() * 16.0 - cameraPos.x;
+                double z = mark.chunkZ() * 16.0 - cameraPos.z;
+                double y = surfaceY + config.chunkYOffset - cameraPos.y;
+                
+                drawChunkFill(fills, x, y, z, r, g, b, alpha, config.chunkHeight);
             }
+            
         } catch (Exception error) {
             System.err.println("[DF Mob Visualizer] Chunk overlay render failed: " + error.getMessage());
         } finally {
@@ -346,48 +364,58 @@ public final class C2MEmod implements ClientModInitializer {
         }
     }
 
-    private void drawChunkSurface(MinecraftClient client, VertexConsumer fills,
-                                   ChunkMark mark, Vec3d cameraPos,
-                                   float r, float g, float b, float alpha) {
-        if (client.world == null) return;
-        int chunkX = mark.chunkX();
-        int chunkZ = mark.chunkZ();
-        int[] heights = getSurfaceHeights(client, chunkX, chunkZ);
-        for (int localX = 0; localX < 16; localX++) {
-            for (int localZ = 0; localZ < 16; localZ++) {
-                int worldX = chunkX * 16 + localX;
-                int worldZ = chunkZ * 16 + localZ;
-                int topY = heights[localX * 16 + localZ];
-                if (topY < client.world.getBottomY()) continue;
-                double x = worldX - cameraPos.x;
-                double y = topY + 0.01 - cameraPos.y;
-                double z = worldZ - cameraPos.z;
-                drawBlockTop(fills, x, y, z, r, g, b, alpha);
-            }
-        }
-    }
-
-    private void drawBlockTop(VertexConsumer v, double x, double y, double z,
-                              float r, float g, float b, float a) {
-        double size = 0.998;
+    private void drawChunkFill(VertexConsumer v, double x, double y, double z,
+                               float r, float g, float b, float a, int height) {
+        double size = 16.0;
+        double y2 = y + height;
+        
         v.vertex((float) x, (float) y, (float) z).color(r, g, b, a);
         v.vertex((float) (x + size), (float) y, (float) z).color(r, g, b, a);
         v.vertex((float) (x + size), (float) y, (float) (z + size)).color(r, g, b, a);
         v.vertex((float) x, (float) y, (float) (z + size)).color(r, g, b, a);
+        
+        if (height > 1) {
+            float sideAlpha = a * 0.25f;
+            
+            v.vertex((float) x, (float) y2, (float) z).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
+            v.vertex((float) x, (float) y2, (float) (z + size)).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
+            v.vertex((float) (x + size), (float) y2, (float) (z + size)).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
+            v.vertex((float) (x + size), (float) y2, (float) z).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
+            
+            v.vertex((float) x, (float) y, (float) z).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y, (float) z).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y2, (float) z).color(r, g, b, sideAlpha);
+            v.vertex((float) x, (float) y2, (float) z).color(r, g, b, sideAlpha);
+            
+            v.vertex((float) x, (float) y, (float) (z + size)).color(r, g, b, sideAlpha);
+            v.vertex((float) x, (float) y2, (float) (z + size)).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y2, (float) (z + size)).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y, (float) (z + size)).color(r, g, b, sideAlpha);
+            
+            v.vertex((float) x, (float) y, (float) z).color(r, g, b, sideAlpha);
+            v.vertex((float) x, (float) y2, (float) z).color(r, g, b, sideAlpha);
+            v.vertex((float) x, (float) y2, (float) (z + size)).color(r, g, b, sideAlpha);
+            v.vertex((float) x, (float) y, (float) (z + size)).color(r, g, b, sideAlpha);
+            
+            v.vertex((float) (x + size), (float) y, (float) z).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y, (float) (z + size)).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y2, (float) (z + size)).color(r, g, b, sideAlpha);
+            v.vertex((float) (x + size), (float) y2, (float) z).color(r, g, b, sideAlpha);
+        }
     }
 
-    private int[] getSurfaceHeights(MinecraftClient client, int chunkX, int chunkZ) {
-        int[] heights = new int[16 * 16];
-        if (client.world == null) return heights;
-        for (int localX = 0; localX < 16; localX++) {
-            for (int localZ = 0; localZ < 16; localZ++) {
-                int worldX = chunkX * 16 + localX;
-                int worldZ = chunkZ * 16 + localZ;
-                heights[localX * 16 + localZ] =
-                    client.world.getTopY(Heightmap.Type.WORLD_SURFACE, worldX, worldZ) - 1;
-            }
+    private int getChunkSurfaceHeight(MinecraftClient client, int chunkX, int chunkZ) {
+        if (client.world == null) return 64;
+        int total = 0;
+        int count = 0;
+        int[][] points = {{0,0}, {7,7}, {15,0}, {15,15}, {0,15}};
+        for (int[] p : points) {
+            int x = chunkX * 16 + p[0];
+            int z = chunkZ * 16 + p[1];
+            total += client.world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1;
+            count++;
         }
-        return heights;
+        return count > 0 ? total / count : 64;
     }
 
     private String statusTags(TrackedMob mob, boolean sessionRow) {
