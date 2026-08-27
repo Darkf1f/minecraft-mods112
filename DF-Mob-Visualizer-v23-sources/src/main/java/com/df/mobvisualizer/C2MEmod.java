@@ -440,7 +440,7 @@ public final class C2MEmod implements ClientModInitializer {
                 
                 double x = mark.chunkX() * 16.0 - cameraPos.x;
                 double z = mark.chunkZ() * 16.0 - cameraPos.z;
-                double y = surfaceY + config.chunkYOffset - cameraPos.y;
+                double y = config.chunkYOffset - cameraPos.y;
                 
                 drawChunkFill(fills, x, y, z, r, g, b, alpha, config.chunkHeight);
             }
