@@ -112,6 +112,8 @@ public final class MobOverlayConfig {
     public boolean centerReturnedMobs = true;
     public boolean centerHurtMobs = true;
     public boolean centerPlayers = false;
+    // list of entity types for centering
+    public String centerEntityTypes = "";
     
     // ===== ЦЕНТРИРОВАНИЕ (СТАРОЕ) =====
     public boolean centerSessionMobs = true;
@@ -205,6 +207,7 @@ public final class MobOverlayConfig {
         if (percentColorRules == null) percentColorRules = "";
         if (customMobColors == null) customMobColors = "";
         if (highlightEntityTypes == null) highlightEntityTypes = "";
+        if (centerEntityTypes == null) centerEntityTypes = "";
     }
 
     private static double clampPercent(double value) {
