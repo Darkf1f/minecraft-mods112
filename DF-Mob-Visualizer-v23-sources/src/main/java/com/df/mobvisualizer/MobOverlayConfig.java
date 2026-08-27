@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class MobOverlayConfig {
-    // ===== ОСНОВНЫЕ НАСТРОЙКИ =====
+    // ===== ОСНОВНЫЕ =====
     public boolean enabled = false;
     public int scanIntervalTicks = 5;
     public double renderDistanceChunks = 12.0;
@@ -52,14 +52,14 @@ public final class MobOverlayConfig {
     public String idColorRules = "id<=10001=#C855E8FF";
     public String percentColorRules = "percent<30=#FFFF2020;percent<50=#FFFFB000";
     
-    // ===== ИНДИВИДУАЛЬНЫЕ ЦВЕТА МОБОВ =====
+    // ===== ИНДИВИДУАЛЬНЫЕ ЦВЕТА =====
     public String customMobColors = "";
     public int chargedCreeperColor = 0xFFB36BFF;
     public int alertColor = 0xFFFFD34E;
     public int hurtColor = 0xFFFF3030;
     public int hurtStarColor = 0xFFFFAA00;
     
-    // ===== ALERT (ОСТАВЛЯЮ, ДОБАВЛЯЮ ВЫБОР МОБОВ) =====
+    // ===== ALERT =====
     public boolean alertEnabled = true;
     public String alertEntityTypes = "minecraft:zombie, minecraft:creeper, minecraft:skeleton";
     public int alertMode = 0;
@@ -69,13 +69,13 @@ public final class MobOverlayConfig {
     public boolean alertCenter = true;
     public boolean alertHighlight = true;
     
-    // ===== HURT (РАНЕНЫЕ) =====
+    // ===== HURT =====
     public boolean hurtEnabled = true;
     public boolean hurtAddToSession = true;
     public boolean hurtCenter = true;
     public boolean hurtHighlight = true;
     
-    // ===== RETURNED (ВЕРНУВШИЕСЯ) =====
+    // ===== RETURNED =====
     public boolean returnedEnabled = true;
     public String returnedEntityTypes = "minecraft:zombie, minecraft:creeper, minecraft:skeleton";
     public boolean returnedAddToSession = true;
@@ -89,7 +89,7 @@ public final class MobOverlayConfig {
     public boolean pinHurtMobs = true;
     public boolean pinLowIds = true;
     
-    // ===== ПОДСВЕТКА ЧЕРЕЗ СТЕНЫ (НОВЫЕ СОСТОЯНИЯ) =====
+    // ===== ПОДСВЕТКА (НОВАЯ) =====
     public boolean seeThroughMobs = false;
     public boolean highlightHurt = true;
     public boolean highlightAlert = true;
@@ -99,7 +99,7 @@ public final class MobOverlayConfig {
     public boolean highlightPlayers = false;
     public boolean highlightAll = false;
     
-    // ===== СТАРЫЕ ПОЛЯ ДЛЯ СОВМЕСТИМОСТИ С ЭКРАНОМ =====
+    // ===== ПОДСВЕТКА (СТАРАЯ ДЛЯ СОВМЕСТИМОСТИ) =====
     public boolean highlightSessionMobs = false;
     public boolean highlightAlertMobs = false;
     public boolean highlightLowIds = false;
@@ -107,21 +107,26 @@ public final class MobOverlayConfig {
     public boolean highlightHostileMobs = false;
     public String highlightEntityTypes = "";
     
-    // ===== ЦЕНТРИРОВАНИЕ (НОВОЕ) =====
+    // ===== ЦЕНТРИРОВАНИЕ =====
     public boolean centerAlertMobs = true;
     public boolean centerReturnedMobs = true;
     public boolean centerHurtMobs = true;
     public boolean centerPlayers = false;
     
-    // ===== ЦЕНТРИРОВАНИЕ (СТАРЫЕ ДЛЯ СОВМЕСТИМОСТИ) =====
+    // ===== ЦЕНТРИРОВАНИЕ (СТАРОЕ) =====
     public boolean centerSessionMobs = true;
     public boolean centerLowIds = true;
     public boolean centerHostileMobs = true;
     
-    // ===== ПРОЦЕНТНЫЕ ЛИМИТЫ (ДЛЯ СОВМЕСТИМОСТИ) =====
+    // ===== ПРОЦЕНТНЫЕ ЛИМИТЫ =====
     public double sessionPercentLimit = 10.0;
     public double highlightPercentLimit = 30.0;
     public double centerPercentLimit = 20.0;
+    
+    // ===== СТАРЫЕ ПОЛЯ =====
+    public boolean hostileOnly = false;
+    public boolean pinHostileMobs = false;
+    public boolean pinPlayers = true;
     
     // ===== ЦВЕТА ДЛЯ ПОДСВЕТКИ =====
     public int highlightHurtColor = 0xFFFF3030;
@@ -169,52 +174,37 @@ public final class MobOverlayConfig {
     }
 
     public void normalize() {
-        // Чанки
         chunkYOffset = Math.max(-10.0, Math.min(200.0, chunkYOffset));
         chunkHeight = Math.max(0.0, Math.min(50.0, chunkHeight));
         chunkOpacity = Math.max(0.0f, Math.min(1.0f, chunkOpacity));
         chunkFillStrength = Math.max(0.1f, Math.min(3.0f, chunkFillStrength));
         chunkBorderOpacity = Math.max(0.0f, Math.min(1.0f, chunkBorderOpacity));
         renderDistanceChunks = Math.max(1.0, Math.min(64.0, renderDistanceChunks));
-        
-        // HUD
         hudScale = Math.max(0.5f, Math.min(2.0f, hudScale));
         hudTextScale = Math.max(0.5f, Math.min(2.0f, hudTextScale));
         hudWidth = Math.max(220, Math.min(1200, hudWidth));
         hudX = Math.max(0, hudX);
         hudY = Math.max(0, hudY);
         scanIntervalTicks = Math.max(1, Math.min(100, scanIntervalTicks));
-        
-        // Цвета
         purpleIdLimit = Math.max(0, purpleIdLimit);
         darkRedPercent = clampPercent(darkRedPercent);
         redPercent = clampPercent(redPercent);
         darkOrangePercent = clampPercent(darkOrangePercent);
         orangePercent = clampPercent(orangePercent);
-        
-        // ALERT
         alertGap = Math.max(0, alertGap);
         alertPercent = clampPercent(alertPercent);
         alertMode = alertMode == 1 ? 1 : 0;
+        sessionPercentLimit = clampPercent(sessionPercentLimit);
+        highlightPercentLimit = clampPercent(highlightPercentLimit);
+        centerPercentLimit = clampPercent(centerPercentLimit);
         if (alertEntityTypes == null) alertEntityTypes = "";
-        
-        // RETURNED
         if (returnedEntityTypes == null) returnedEntityTypes = "";
-        
-        // Сессия
         if (pinnedEntityTypes == null) pinnedEntityTypes = "";
-        
-        // Правила
         if (chunkColorRules == null) chunkColorRules = "";
         if (idColorRules == null) idColorRules = "";
         if (percentColorRules == null) percentColorRules = "";
         if (customMobColors == null) customMobColors = "";
         if (highlightEntityTypes == null) highlightEntityTypes = "";
-        
-        // Процентные лимиты
-        sessionPercentLimit = clampPercent(sessionPercentLimit);
-        highlightPercentLimit = clampPercent(highlightPercentLimit);
-        centerPercentLimit = clampPercent(centerPercentLimit);
     }
 
     private static double clampPercent(double value) {
