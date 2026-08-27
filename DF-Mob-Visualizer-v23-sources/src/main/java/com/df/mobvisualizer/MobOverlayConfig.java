@@ -35,8 +35,8 @@ public final class MobOverlayConfig {
     public float chunkBorderOpacity = 0.95f;
     public boolean markOnlyRuleChunks = true;
     public String chunkColorRules = "id<50=#C855E8FF;id<10000=#FF7A0000;percent<5=#FF7A0000;percent<20=#FFFF2020;percent<30=#FFFF7A00;percent<50=#FFFFB000";
-    public double chunkYOffset = 0.5;      // -10.0 до 200.0
-    public double chunkHeight = 1.0;        // 0.0 до 50.0 (теперь double!)
+    public double chunkYOffset = 0.5;
+    public double chunkHeight = 1.0;
     
     // ===== ЦВЕТА ПО ID =====
     public int purpleIdLimit = 10_000;
@@ -55,11 +55,14 @@ public final class MobOverlayConfig {
     // ===== ИНДИВИДУАЛЬНЫЕ ЦВЕТА МОБОВ =====
     public String customMobColors = "";
     public int chargedCreeperColor = 0xFFB36BFF;
+    public int alertColor = 0xFFFFD34E;
+    public int hurtColor = 0xFFFF3030;
+    public int hurtStarColor = 0xFFFFAA00;
     
     // ===== ALERT (ОСТАВЛЯЮ, ДОБАВЛЯЮ ВЫБОР МОБОВ) =====
     public boolean alertEnabled = true;
     public String alertEntityTypes = "minecraft:zombie, minecraft:creeper, minecraft:skeleton";
-    public int alertMode = 0;           // 0 = разница ID, 1 = процент
+    public int alertMode = 0;
     public int alertGap = 100_000;
     public double alertPercent = 80.0;
     public boolean alertAddToSession = true;
@@ -71,8 +74,6 @@ public final class MobOverlayConfig {
     public boolean hurtAddToSession = true;
     public boolean hurtCenter = true;
     public boolean hurtHighlight = true;
-    public int hurtColor = 0xFFFF3030;        // пока мигает
-    public int hurtStarColor = 0xFFFFAA00;    // после того как перестал мигать (HURT*)
     
     // ===== RETURNED (ВЕРНУВШИЕСЯ) =====
     public boolean returnedEnabled = true;
@@ -85,8 +86,10 @@ public final class MobOverlayConfig {
     public boolean sessionEnabled = true;
     public boolean persistSession = true;
     public String pinnedEntityTypes = "";
+    public boolean pinHurtMobs = true;
+    public boolean pinLowIds = true;
     
-    // ===== ПОДСВЕТКА ЧЕРЕЗ СТЕНЫ (ПО СОСТОЯНИЯМ) =====
+    // ===== ПОДСВЕТКА ЧЕРЕЗ СТЕНЫ (НОВЫЕ СОСТОЯНИЯ) =====
     public boolean seeThroughMobs = false;
     public boolean highlightHurt = true;
     public boolean highlightAlert = true;
@@ -96,19 +99,37 @@ public final class MobOverlayConfig {
     public boolean highlightPlayers = false;
     public boolean highlightAll = false;
     
-    // ЦВЕТА ДЛЯ ПОДСВЕТКИ (каждое состояние свой цвет)
+    // ===== СТАРЫЕ ПОЛЯ ДЛЯ СОВМЕСТИМОСТИ С ЭКРАНОМ =====
+    public boolean highlightSessionMobs = false;
+    public boolean highlightAlertMobs = false;
+    public boolean highlightLowIds = false;
+    public boolean highlightHurtMobs = false;
+    public boolean highlightHostileMobs = false;
+    public String highlightEntityTypes = "";
+    
+    // ===== ЦЕНТРИРОВАНИЕ (НОВОЕ) =====
+    public boolean centerAlertMobs = true;
+    public boolean centerReturnedMobs = true;
+    public boolean centerHurtMobs = true;
+    public boolean centerPlayers = false;
+    
+    // ===== ЦЕНТРИРОВАНИЕ (СТАРЫЕ ДЛЯ СОВМЕСТИМОСТИ) =====
+    public boolean centerSessionMobs = true;
+    public boolean centerLowIds = true;
+    public boolean centerHostileMobs = true;
+    
+    // ===== ПРОЦЕНТНЫЕ ЛИМИТЫ (ДЛЯ СОВМЕСТИМОСТИ) =====
+    public double sessionPercentLimit = 10.0;
+    public double highlightPercentLimit = 30.0;
+    public double centerPercentLimit = 20.0;
+    
+    // ===== ЦВЕТА ДЛЯ ПОДСВЕТКИ =====
     public int highlightHurtColor = 0xFFFF3030;
     public int highlightAlertColor = 0xFFC855E8;
     public int highlightReturnedColor = 0xFFFFD34E;
     public int highlightChargedColor = 0xFFB36BFF;
     public int highlightRenamedColor = 0xFFFFFFFF;
     public int highlightPlayerColor = 0xFF55CCFF;
-    
-    // ===== ЦЕНТРИРОВАНИЕ =====
-    public boolean centerAlertMobs = true;
-    public boolean centerReturnedMobs = true;
-    public boolean centerHurtMobs = true;
-    public boolean centerPlayers = false;
     
     // ===== КЛАВИШИ =====
     public int hudKey = 297;
@@ -188,6 +209,12 @@ public final class MobOverlayConfig {
         if (idColorRules == null) idColorRules = "";
         if (percentColorRules == null) percentColorRules = "";
         if (customMobColors == null) customMobColors = "";
+        if (highlightEntityTypes == null) highlightEntityTypes = "";
+        
+        // Процентные лимиты
+        sessionPercentLimit = clampPercent(sessionPercentLimit);
+        highlightPercentLimit = clampPercent(highlightPercentLimit);
+        centerPercentLimit = clampPercent(centerPercentLimit);
     }
 
     private static double clampPercent(double value) {
