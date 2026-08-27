@@ -319,11 +319,8 @@ public final class C2MEmod implements ClientModInitializer {
         
         try {
             RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugFilledQuads());
-            if (fills == null) {
-                fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
-            }
-            
+            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
+
             for (ChunkMark mark : state.visibleChunks()) {
                 double centerX = mark.chunkX() * 16.0 + 8.0;
                 double centerZ = mark.chunkZ() * 16.0 + 8.0;
