@@ -177,4 +177,10 @@ public final class MobOverlayConfig {
         chunkOpacity = Math.max(0.0f, Math.min(1.0f, chunkOpacity));
         chunkBorderOpacity = Math.max(0.0f, Math.min(1.0f, chunkBorderOpacity));
         chunkFillStrength = Math.max(0.1f, Math.min(3.0f, chunkFillStrength));
-        renderDistanceChunks = Math.max(1
+        renderDistanceChunks = Math.max(1.0, renderDistanceChunks);
+    }
+
+    private static double clampPercent(double v) {
+        return Math.max(0.0, Math.min(100.0, v));
+    }
+}
