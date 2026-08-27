@@ -60,25 +60,21 @@ public final class C2MEmod implements ClientModInitializer {
     private static final KeyBinding CLEAR_CHUNKS = new KeyBinding(
             "key.df_mob_visualizer.clear_chunks",
             InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY);
-    private static final KeyBinding SURFACE_OVERLAY = new KeyBinding(
-            "key.df_mob_visualizer.surface_overlay",
-            InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F12, CATEGORY);
 
     private MobOverlayConfig config;
     private MobOverlayState state;
     private boolean hudOpen;
     private boolean chunksOpen;
     private boolean mobHighlightsOpen;
-    private boolean surfaceProbe;
-    private final Map<Long, int[]> surfaceHeightCache = new HashMap<>();
-    private Object surfaceCacheWorld;
-    private long surfaceCacheStamp = Long.MIN_VALUE;
     private int scanCooldown;
     private int centerChunkX = Integer.MIN_VALUE;
     private int centerChunkZ = Integer.MIN_VALUE;
     private int centerMarkerCount;
     private boolean clearSessionScanDown;
     private boolean clearChunksScanDown;
+    private final Map<Long, Integer> surfaceHeightCache = new HashMap<>();
+    private Object surfaceCacheWorld;
+    private long surfaceCacheStamp = Long.MIN_VALUE;
 
     @Override
     public void onInitializeClient() {
@@ -89,13 +85,13 @@ public final class C2MEmod implements ClientModInitializer {
         hudOpen = config.showHud;
         chunksOpen = config.showChunkOverlay;
         mobHighlightsOpen = config.seeThroughMobs;
+        
         KeyBindingHelper.registerKeyBinding(TOGGLE_HUD);
         KeyBindingHelper.registerKeyBinding(TOGGLE_CHUNKS);
         KeyBindingHelper.registerKeyBinding(TOGGLE_MOB_HIGHLIGHTS);
         KeyBindingHelper.registerKeyBinding(OPEN_SETTINGS);
         KeyBindingHelper.registerKeyBinding(CLEAR_SESSION);
         KeyBindingHelper.registerKeyBinding(CLEAR_CHUNKS);
-        KeyBindingHelper.registerKeyBinding(SURFACE_OVERLAY);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> tick(client));
         HudRenderCallback.EVENT.register((drawContext, tickDelta) -> renderHud(drawContext));
@@ -106,33 +102,29 @@ public final class C2MEmod implements ClientModInitializer {
     private void tick(MinecraftClient client) {
         while (TOGGLE_HUD.wasPressed()) { hudOpen = !hudOpen; config.showHud = hudOpen; config.save(); }
         while (TOGGLE_CHUNKS.wasPressed()) { chunksOpen = !chunksOpen; config.showChunkOverlay = chunksOpen; config.save(); }
-        while (SURFACE_OVERLAY.wasPressed()) {
-            chunksOpen = !chunksOpen;
-            config.enabled = true;
-            config.showChunkOverlay = chunksOpen;
-            config.showChunkFill = true;
-            surfaceProbe = chunksOpen;
-            config.save();
-        }
         while (TOGGLE_MOB_HIGHLIGHTS.wasPressed()) {
-            mobHighlightsOpen = !mobHighlightsOpen; config.seeThroughMobs = mobHighlightsOpen; config.save();
+            mobHighlightsOpen = !mobHighlightsOpen;
+            config.seeThroughMobs = mobHighlightsOpen;
+            config.save();
         }
         hudOpen = config.showHud;
         chunksOpen = config.showChunkOverlay;
         mobHighlightsOpen = config.seeThroughMobs;
+        
         while (OPEN_SETTINGS.wasPressed()) {
             client.setScreen(new MobSettingsScreenV2(client.currentScreen, config, state));
         }
         while (CLEAR_SESSION.wasPressed()) state.clearSession();
         while (CLEAR_CHUNKS.wasPressed()) state.clearChunks();
-        boolean clearSessionDown = scanFallbackDown(client, config.clearSessionKey,
-                config.clearSessionScanCode);
+        
+        boolean clearSessionDown = scanFallbackDown(client, config.clearSessionKey, config.clearSessionScanCode);
         if (clearSessionDown && !clearSessionScanDown) state.clearSession();
         clearSessionScanDown = clearSessionDown;
-        boolean clearChunksDown = scanFallbackDown(client, config.clearChunksKey,
-                config.clearChunksScanCode);
+        
+        boolean clearChunksDown = scanFallbackDown(client, config.clearChunksKey, config.clearChunksScanCode);
         if (clearChunksDown && !clearChunksScanDown) state.clearChunks();
         clearChunksScanDown = clearChunksDown;
+        
         if (!config.enabled) return;
         if (client.world == null || client.player == null || --scanCooldown > 0) return;
         scanCooldown = config.scanIntervalTicks;
@@ -143,30 +135,35 @@ public final class C2MEmod implements ClientModInitializer {
         }
         state.beginLiveScan(currentMaxId);
         List<TrackedMob> centerMarkers = new ArrayList<>();
+        
         for (Entity entity : client.world.getEntities()) {
             if (entity == client.player) continue;
             if (!config.showPlayers && entity.isPlayer()) continue;
+            if (!config.includeOtherEntities && !(entity instanceof LivingEntity)) continue;
+            
             int id = entity.getId();
             String typeId = entityTypeId(entity);
-            int color = MobColors.forEntity(typeId, id, currentMaxId, config);
             boolean alert = isAlert(entity, id, currentMaxId);
             boolean player = entity.isPlayer();
-            boolean hostile = isHostile(typeId);
-            if (config.hostileOnly && !hostile && !(entity instanceof LivingEntity living && living.hurtTime > 0)) continue;
-            if (!config.includeOtherEntities && !(entity instanceof LivingEntity)) continue;
             boolean hurt = entity instanceof LivingEntity living && living.hurtTime > 0;
             boolean chargedCreeper = entity instanceof CreeperEntity creeper && creeper.isCharged();
+            boolean renamed = entity.hasCustomName();
+            boolean returned = state.isReturned(id);
+            
+            int color = MobColors.forEntity(typeId, id, currentMaxId, config, hurt, returned, alert);
             if (chargedCreeper && MobColors.customColor("minecraft:charged_creeper", config) == null) {
                 color = config.chargedCreeperColor;
             }
             if (hurt) color = config.hurtColor;
+            
             TrackedMob tracked = new TrackedMob(id, typeId, entity.getName().getString(),
-                    entity.getBlockX(), entity.getBlockY(), entity.getBlockZ(), alert, color,
-                    player, hostile, hurt, chargedCreeper, entity.hasCustomName());
+                    entity.getBlockX(), entity.getBlockY(), entity.getBlockZ(),
+                    alert, color, player, hurt, chargedCreeper, renamed, returned);
             state.accept(tracked);
             if (centerMatches(tracked)) centerMarkers.add(tracked);
         }
         calculateCenter(centerMarkers);
+        
         if (client.world.getTime() % 100 == 0) {
             state.saveSessionIfDirty();
             state.saveChunks();
@@ -209,24 +206,25 @@ public final class C2MEmod implements ClientModInitializer {
         drawContext.getMatrices().scale(totalScale, totalScale, 1.0f);
         x = Math.round(x / totalScale);
         y = Math.round(y / totalScale);
-        drawContext.drawTextWithShadow(textRenderer, Text.literal("Мобов сейчас: " + state.currentMobCount()
+        
+        drawContext.drawTextWithShadow(textRenderer, Text.literal("Мобов: " + state.currentMobCount()
                 + "   Сессия: " + state.sessionCount() + "   Чанков: " + state.visibleChunks().size()), x, y, 0xFFFFFFFF);
         y += 12;
-        drawContext.drawTextWithShadow(textRenderer, Text.literal("MAX ID сейчас: " + state.currentMaxId()
-                + "   MAX ID за историю: " + state.maxSeenId()), x, y, 0xFFFFFFFF);
+        drawContext.drawTextWithShadow(textRenderer, Text.literal("MAX ID: " + state.currentMaxId()
+                + "   MAX ID история: " + state.maxSeenId()), x, y, 0xFFFFFFFF);
         y += 12;
-        drawContext.drawTextWithShadow(textRenderer, Text.literal("F7 — мобы | F9 — чанки | F10 — настройки | F8 — HUD"), x, y, 0xFFB9A7C9);
+        drawContext.drawTextWithShadow(textRenderer, Text.literal("F7 — подсветка | F9 — чанки | F10 — настройки | F8 — HUD"), x, y, 0xFFB9A7C9);
         y += 14;
         drawContext.drawTextWithShadow(textRenderer,
-                Text.literal(centerChunkX == Integer.MIN_VALUE ? "ЦЕНТР: нет подходящих alert-мобов"
+                Text.literal(centerChunkX == Integer.MIN_VALUE ? "ЦЕНТР: нет мобов"
                         : "ЦЕНТР: X " + (centerChunkX * 16 + 8) + " Z " + (centerChunkZ * 16 + 8)
                         + " (" + centerMarkerCount + " мобов)"),
-                x, y, centerChunkX == Integer.MIN_VALUE ? 0xFFB9A7C9 : config.alertColor);
+                x, y, centerChunkX == Integer.MIN_VALUE ? 0xFFB9A7C9 : 0xFFFFD34E);
         y += 14;
 
         for (TrackedMob mob : state.visibleMobs()) {
             int color = mob.color();
-            drawContext.drawTextWithShadow(textRenderer, Text.literal(statusTags(mob, false)
+            drawContext.drawTextWithShadow(textRenderer, Text.literal(statusTags(mob)
                     + (mob.chargedCreeper() ? "[CHARGED] " : "")
                     + mob.name() + (mob.renamed() ? " [переименован]" : "") + "  ID-" + mob.id()
                     + " (" + formatPercent(mob.id(), state.currentMaxId()) + "%)"
@@ -245,11 +243,11 @@ public final class C2MEmod implements ClientModInitializer {
             y += 11;
         }
         y += 3;
-        drawContext.drawTextWithShadow(textRenderer, Text.literal("СЕССИЯ (" + state.sessionCount() + ")"), x, y, config.alertColor);
+        drawContext.drawTextWithShadow(textRenderer, Text.literal("СЕССИЯ (" + state.sessionCount() + ")"), x, y, 0xFFFFD34E);
         y += 12;
         for (TrackedMob mob : state.visibleSession()) {
             int color = mob.color();
-            String reason = statusTags(mob, true).replace("[", "").replace("]", "").trim()
+            String reason = statusTags(mob).replace("[", "").replace("]", "").trim()
                     .replace(" ", ", ");
             if (reason.isBlank()) reason = "MOB";
             drawContext.drawTextWithShadow(textRenderer, Text.literal("[" + reason + "] "
@@ -261,48 +259,161 @@ public final class C2MEmod implements ClientModInitializer {
         drawContext.getMatrices().pop();
     }
 
+    private String statusTags(TrackedMob mob) {
+        StringBuilder tags = new StringBuilder();
+        if (mob.alert()) tags.append("[ALERT] ");
+        if (mob.hurt()) tags.append("[HURT] ");
+        if (mob.returned()) tags.append("[RETURNED] ");
+        if (mob.chargedCreeper()) tags.append("[CHARGED] ");
+        if (mob.renamed()) tags.append("[RENAMED] ");
+        if (mob.player()) tags.append("[PLAYER] ");
+        return tags.toString();
+    }
+
+    private static String formatPercent(int id, int maxId) {
+        double percent = maxId <= 0 ? 0.0 : id * 100.0 / maxId;
+        return String.format(Locale.ROOT, "%.2f", percent);
+    }
+
+    private boolean isAlert(Entity entity, int id, int maxId) {
+        String typeId = entityTypeId(entity);
+        if (!config.alertEnabled || entity.isPlayer()) return false;
+        if (!matchesAlertType(typeId)) return false;
+        if (config.alertMode == 1) return maxId > 0 && id * 100.0 / maxId < config.alertPercent;
+        return maxId > 0 && maxId - id > config.alertGap;
+    }
+
+    private boolean matchesAlertType(String type) {
+        if (config.alertEntityTypes == null || config.alertEntityTypes.isBlank()) return true;
+        String normalized = type.toLowerCase(Locale.ROOT);
+        for (String raw : config.alertEntityTypes.split(",")) {
+            String wanted = raw.trim().toLowerCase(Locale.ROOT);
+            if (wanted.isBlank()) continue;
+            if (!wanted.contains(":")) wanted = "minecraft:" + wanted;
+            if (normalized.equals(wanted) || normalized.endsWith(":" + wanted.substring(wanted.indexOf(':') + 1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesReturnedType(String type) {
+        if (config.returnedEntityTypes == null || config.returnedEntityTypes.isBlank()) return true;
+        String normalized = type.toLowerCase(Locale.ROOT);
+        for (String raw : config.returnedEntityTypes.split(",")) {
+            String wanted = raw.trim().toLowerCase(Locale.ROOT);
+            if (wanted.isBlank()) continue;
+            if (!wanted.contains(":")) wanted = "minecraft:" + wanted;
+            if (normalized.equals(wanted) || normalized.endsWith(":" + wanted.substring(wanted.indexOf(':') + 1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean centerMatches(TrackedMob mob) {
+        if (config.centerAlertMobs && mob.alert()) return true;
+        if (config.centerReturnedMobs && mob.returned()) return true;
+        if (config.centerHurtMobs && mob.hurt()) return true;
+        if (config.centerPlayers && mob.player()) return true;
+        return false;
+    }
+
+    private boolean shouldHighlight(TrackedMob mob) {
+        if (config.highlightAll) return true;
+        if (config.highlightHurt && mob.hurt()) return true;
+        if (config.highlightAlert && mob.alert()) return true;
+        if (config.highlightReturned && mob.returned()) return true;
+        if (config.highlightCharged && mob.chargedCreeper()) return true;
+        if (config.highlightRenamed && mob.renamed()) return true;
+        if (config.highlightPlayers && mob.player()) return true;
+        return false;
+    }
+
     private void renderThroughWalls(WorldRenderContext context) {
         if (!config.enabled || !mobHighlightsOpen || !config.seeThroughMobs || state == null
                 || MinecraftClient.getInstance().world == null
                 || context.matrixStack() == null || context.consumers() == null) return;
+        
         MinecraftClient client = MinecraftClient.getInstance();
         Vec3d cameraPos = context.camera().getPos();
         EntityRenderDispatcher dispatcher = client.getEntityRenderDispatcher();
+        
         RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        VertexConsumer wallLines = context.consumers().getBuffer(RenderLayer.getLines());
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.disableCull();
+        
         try {
             RenderSystem.lineWidth(2.0f);
+            VertexConsumer wallLines = context.consumers().getBuffer(RenderLayer.getLines());
+            
             for (Entity entity : client.world.getEntities()) {
                 if (entity == client.player) continue;
+                if (!(entity instanceof LivingEntity)) continue;
+                
                 int id = entity.getId();
                 String typeId = entityTypeId(entity);
+                boolean alert = isAlert(entity, id, state.currentMaxId());
+                boolean hurt = entity instanceof LivingEntity living && living.hurtTime > 0;
+                boolean chargedCreeper = entity instanceof CreeperEntity creeper && creeper.isCharged();
+                boolean renamed = entity.hasCustomName();
+                boolean returned = state.isReturned(id);
+                int color = MobColors.forEntity(typeId, id, state.currentMaxId(), config, hurt, returned, alert);
+                if (chargedCreeper && MobColors.customColor("minecraft:charged_creeper", config) == null) {
+                    color = config.chargedCreeperColor;
+                }
+                if (hurt) color = config.hurtColor;
+                
                 TrackedMob mob = new TrackedMob(id, typeId, entity.getName().getString(),
-                        entity.getBlockX(), entity.getBlockY(), entity.getBlockZ(), isAlert(entity, id, state.currentMaxId()),
-                        MobColors.forEntity(typeId, id, state.currentMaxId(), config),
-                        entity.isPlayer(), isHostile(typeId),
-                        entity instanceof LivingEntity living && living.hurtTime > 0,
-                        entity instanceof CreeperEntity creeper && creeper.isCharged(), entity.hasCustomName());
+                        entity.getBlockX(), entity.getBlockY(), entity.getBlockZ(),
+                        alert, color, entity.isPlayer(), hurt, chargedCreeper, renamed, returned);
+                
                 if (!shouldHighlight(mob)) continue;
                 if (!isBehindBlock(client, entity, cameraPos)) continue;
-                drawEntityBox(wallLines, entity, cameraPos, mob.color(), 0.95f);
+                
+                // Рисуем МОДЕЛЬ моба (через стены)
                 context.matrixStack().push();
                 try {
-                    dispatcher.render(entity, entity.getX() - cameraPos.x,
-                            entity.getY() - cameraPos.y, entity.getZ() - cameraPos.z,
-                            entity.getYaw(), context.matrixStack(), context.consumers(),
-                            15728880);
+                    dispatcher.render(entity, 
+                        entity.getX() - cameraPos.x,
+                        entity.getY() - cameraPos.y, 
+                        entity.getZ() - cameraPos.z,
+                        entity.getYaw(), 
+                        context.matrixStack(), 
+                        context.consumers(),
+                        15728880);
                 } finally {
                     context.matrixStack().pop();
                 }
+                
+                // Хитбокс (запасной вариант)
+                drawEntityBox(wallLines, entity, cameraPos, color, 0.95f);
             }
         } finally {
             RenderSystem.depthMask(true);
             RenderSystem.enableCull();
             RenderSystem.enableDepthTest();
         }
+    }
+
+    private static boolean isBehindBlock(MinecraftClient client, Entity entity, Vec3d cameraPos) {
+        if (client.world == null) return false;
+        Vec3d target = entity.getBoundingBox().getCenter();
+        var hit = client.world.raycast(new RaycastContext(cameraPos, target,
+                RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity));
+        return hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK
+                && hit.getPos().squaredDistanceTo(cameraPos) + 0.01
+                < target.squaredDistanceTo(cameraPos);
+    }
+
+    private static String entityTypeId(Entity entity) {
+        return Registries.ENTITY_TYPE.getId(entity.getType()).toString().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean scanFallbackDown(MinecraftClient client, int keyCode, int scanCode) {
+        return keyCode != GLFW.GLFW_KEY_UNKNOWN && keyCode != 0
+                && InputUtil.isKeyPressed(client.getWindow().getHandle(), keyCode);
     }
 
     private void renderChunks(WorldRenderContext context) {
@@ -325,6 +436,7 @@ public final class C2MEmod implements ClientModInitializer {
                 fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
             }
             
+            refreshSurfaceCache(client);
             Map<Long, Integer> chunkHeights = new HashMap<>();
             
             for (ChunkMark mark : state.visibleChunks()) {
@@ -338,10 +450,7 @@ public final class C2MEmod implements ClientModInitializer {
                 float b = (mark.color() & 255) / 255f;
                 float alpha = config.chunkOpacity * config.chunkFillStrength;
                 alpha = Math.max(0.1f, Math.min(0.9f, alpha));
-                
-                if (mark.ring()) {
-                    alpha *= 0.35f;
-                }
+                if (mark.ring()) alpha *= 0.35f;
                 
                 long chunkKey = MobOverlayState.chunkKey(mark.chunkX(), mark.chunkZ());
                 int surfaceY = chunkHeights.computeIfAbsent(chunkKey, k -> 
@@ -354,7 +463,6 @@ public final class C2MEmod implements ClientModInitializer {
                 
                 drawChunkFill(fills, x, y, z, r, g, b, alpha, config.chunkHeight);
             }
-            
         } catch (Exception error) {
             System.err.println("[DF Mob Visualizer] Chunk overlay render failed: " + error.getMessage());
         } finally {
@@ -365,7 +473,7 @@ public final class C2MEmod implements ClientModInitializer {
     }
 
     private void drawChunkFill(VertexConsumer v, double x, double y, double z,
-                               float r, float g, float b, float a, int height) {
+                               float r, float g, float b, float a, double height) {
         double size = 16.0;
         double y2 = y + height;
         
@@ -374,13 +482,14 @@ public final class C2MEmod implements ClientModInitializer {
         v.vertex((float) (x + size), (float) y, (float) (z + size)).color(r, g, b, a);
         v.vertex((float) x, (float) y, (float) (z + size)).color(r, g, b, a);
         
-        if (height > 1) {
+        if (height > 0.1) {
             float sideAlpha = a * 0.25f;
+            float bottomAlpha = a * 0.6f;
             
-            v.vertex((float) x, (float) y2, (float) z).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
-            v.vertex((float) x, (float) y2, (float) (z + size)).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
-            v.vertex((float) (x + size), (float) y2, (float) (z + size)).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
-            v.vertex((float) (x + size), (float) y2, (float) z).color(r * 0.7f, g * 0.7f, b * 0.7f, a * 0.6f);
+            v.vertex((float) x, (float) y2, (float) z).color(r * 0.7f, g * 0.7f, b * 0.7f, bottomAlpha);
+            v.vertex((float) x, (float) y2, (float) (z + size)).color(r * 0.7f, g * 0.7f, b * 0.7f, bottomAlpha);
+            v.vertex((float) (x + size), (float) y2, (float) (z + size)).color(r * 0.7f, g * 0.7f, b * 0.7f, bottomAlpha);
+            v.vertex((float) (x + size), (float) y2, (float) z).color(r * 0.7f, g * 0.7f, b * 0.7f, bottomAlpha);
             
             v.vertex((float) x, (float) y, (float) z).color(r, g, b, sideAlpha);
             v.vertex((float) (x + size), (float) y, (float) z).color(r, g, b, sideAlpha);
@@ -418,115 +527,13 @@ public final class C2MEmod implements ClientModInitializer {
         return count > 0 ? total / count : 64;
     }
 
-    private String statusTags(TrackedMob mob, boolean sessionRow) {
-        StringBuilder tags = new StringBuilder();
-        if (mob.alert()) tags.append("[ALERT] ");
-        if (mob.hurt()) tags.append("[HURT] ");
-        if (sessionRow && mob.hurt() && config.pinHurtMobs) tags.append("[HURT*] ");
-        if (mob.hostile()) tags.append("[HOSTILE] ");
-        if (state.currentMaxId() > 0
-            && mob.id() * 100.0 / state.currentMaxId() < config.sessionPercentLimit) {
-            tags.append("[LOW_ID] ");
+    private void refreshSurfaceCache(MinecraftClient client) {
+        long stamp = client.world.getTime() / 10L;
+        if (surfaceCacheWorld != client.world || surfaceCacheStamp != stamp) {
+            surfaceHeightCache.clear();
+            surfaceCacheWorld = client.world;
+            surfaceCacheStamp = stamp;
         }
-        if (mob.player()) tags.append("[PLAYER] ");
-        return tags.toString();
-    }
-
-    private static String formatPercent(int id, int maxId) {
-        double percent = maxId <= 0 ? 0.0 : id * 100.0 / maxId;
-        return String.format(Locale.ROOT, "%.2f", percent);
-    }
-
-    private static boolean isBehindBlock(MinecraftClient client, Entity entity, Vec3d cameraPos) {
-        if (client.world == null) return false;
-        Vec3d target = entity.getBoundingBox().getCenter();
-        var hit = client.world.raycast(new RaycastContext(cameraPos, target,
-                RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity));
-        return hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK
-                && hit.getPos().squaredDistanceTo(cameraPos) + 0.01
-                < target.squaredDistanceTo(cameraPos);
-    }
-
-    private static boolean scanFallbackDown(MinecraftClient client, int keyCode, int scanCode) {
-        return keyCode != GLFW.GLFW_KEY_UNKNOWN && keyCode != 0
-                && InputUtil.isKeyPressed(client.getWindow().getHandle(), keyCode);
-    }
-
-    private boolean isAlert(Entity entity, int id, int maxId) {
-        String typeId = entityTypeId(entity);
-        if (!config.alertEnabled || entity.isPlayer() || typeId.endsWith(":enderman")
-                || !matchesConfiguredType(typeId, config.alertEntityTypes)) return false;
-        if (config.alertMode == 1) return maxId > 0 && id * 100.0 / maxId < config.alertPercent;
-        return maxId > 0 && maxId - id > config.alertGap;
-    }
-
-    private static String entityTypeId(Entity entity) {
-        return Registries.ENTITY_TYPE.getId(entity.getType()).toString().toLowerCase(Locale.ROOT);
-    }
-
-    private static boolean isHostile(String type) {
-        return type.contains("zombie") || type.contains("skeleton") || type.contains("creeper")
-                || type.contains("spider") || type.contains("enderman") || type.contains("blaze")
-                || type.contains("witch") || type.contains("phantom") || type.contains("pillager")
-                || type.contains("vindicator") || type.contains("evoker") || type.contains("ravager")
-                || type.contains("guardian") || type.contains("shulker") || type.contains("hoglin")
-                || type.contains("piglin") || type.contains("breeze") || type.contains("slime");
-    }
-
-    private boolean shouldHighlight(TrackedMob mob) {
-        if (config.highlightEntityTypes != null && !config.highlightEntityTypes.isBlank()
-                && !matchesConfiguredType(mob, config.highlightEntityTypes)) {
-            return false;
-        }
-        boolean lowId = state.currentMaxId() > 0
-                && mob.id() * 100.0 / state.currentMaxId() < config.highlightPercentLimit;
-        return (config.highlightSessionMobs && state.isInSession(mob.id()))
-                || (config.highlightAlertMobs && config.alertHighlight && mob.alert())
-                || (config.highlightLowIds && lowId)
-                || (config.highlightHurtMobs && mob.hurt())
-                || (config.highlightHostileMobs && mob.hostile())
-                || (config.highlightPlayers && mob.player());
-    }
-
-    private static boolean matchesConfiguredType(TrackedMob mob, String configured) {
-        if (configured == null || configured.isBlank()) return true;
-        String normalized = mob.type().toLowerCase(Locale.ROOT);
-        for (String raw : configured.split(",")) {
-            String wanted = raw.trim().toLowerCase(Locale.ROOT);
-            if (wanted.isBlank()) continue;
-            if (!wanted.contains(":")) wanted = "minecraft:" + wanted;
-            if (mob.chargedCreeper() && wanted.endsWith(":charged_creeper")) return true;
-            if (normalized.equals(wanted) || normalized.endsWith(":" + wanted.substring(wanted.indexOf(':') + 1))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean matchesConfiguredType(String type, String configured) {
-        if (configured == null || configured.isBlank()) return true;
-        String normalized = type.toLowerCase(Locale.ROOT);
-        for (String raw : configured.split(",")) {
-            String wanted = raw.trim().toLowerCase(Locale.ROOT);
-            if (wanted.isBlank()) continue;
-            if (!wanted.contains(":")) wanted = "minecraft:" + wanted;
-            if (normalized.equals(wanted) || normalized.endsWith(":" + wanted.substring(wanted.indexOf(':') + 1))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean centerMatches(TrackedMob mob) {
-        boolean lowId = state.currentMaxId() > 0
-                && mob.id() * 100.0 / state.currentMaxId() < config.centerPercentLimit;
-        boolean category = (config.centerAlertMobs && config.alertCenter && mob.alert())
-                || (config.centerSessionMobs && state.isInSession(mob.id()))
-                || (config.centerLowIds && lowId)
-                || (config.centerHurtMobs && mob.hurt())
-                || (config.centerHostileMobs && mob.hostile())
-                || (config.centerPlayers && mob.player());
-        return category;
     }
 
     private void calculateCenter(List<TrackedMob> markers) {
