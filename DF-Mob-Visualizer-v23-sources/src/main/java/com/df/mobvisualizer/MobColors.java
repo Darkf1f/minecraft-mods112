@@ -5,14 +5,44 @@ import java.util.Locale;
 public final class MobColors {
     private MobColors() {}
 
+    public static int forEntity(String type, int id, int maxId, MobOverlayConfig config,
+                                 boolean hurt, boolean returned, boolean alert) {
+        // 1. ALERT цвет (если моб ALERT)
+        if (alert && config.alertEnabled) {
+            return 0xFFFFD34E; // жёлтый
+        }
+        
+        // 2. HURT цвет (если моб сейчас ранен)
+        if (hurt && config.hurtEnabled) {
+            return config.hurtColor;
+        }
+        
+        // 3. RETURNED цвет (если моб вернулся)
+        if (returned && config.returnedEnabled) {
+            return 0xFFFFAA00; // оранжевый
+        }
+        
+        // 4. Индивидуальный цвет моба
+        Integer custom = customColor(type, config);
+        if (custom != null) return custom;
+        
+        // 5. Цвет по ID/проценту
+        return forId(id, maxId, config);
+    }
+
     public static int forId(int id, int maxId, MobOverlayConfig config) {
-        // Explicit ID exceptions are always stronger than percentage bands.
+        // ID правила
         Integer ruleColor = ruleColor(id, maxId, config.idColorRules, false);
         if (ruleColor != null) return ruleColor;
+        
+        // Процент правила
         ruleColor = ruleColor(id, maxId, config.percentColorRules, true);
         if (ruleColor != null) return ruleColor;
+        
+        // Стандартные цвета
         if (id < config.purpleIdLimit) return config.purpleColor;
         if (maxId <= 0) return config.orangeColor;
+        
         double percent = id * 100.0 / maxId;
         if (percent < config.darkRedPercent) return config.darkRedColor;
         if (percent < config.redPercent) return config.redColor;
@@ -48,20 +78,12 @@ public final class MobColors {
                 String hex = pair[1].trim().replace("#", "").replace("0x", "").replace("0X", "");
                 validRules++;
                 return parseColor(hex);
-            } catch (NumberFormatException ignored) {
-                // Skip only the malformed rule.
-            }
+            } catch (NumberFormatException ignored) {}
             validRules++;
         }
         return null;
     }
 
-    public static int forEntity(String type, int id, int maxId, MobOverlayConfig config) {
-        Integer custom = customColor(type, config);
-        return custom != null ? custom : forId(id, maxId, config);
-    }
-
-    /** Returns a user-defined per-entity color, or null when no override exists. */
     public static Integer customColor(String type, MobOverlayConfig config) {
         if (config.customMobColors != null && !config.customMobColors.isBlank()) {
             String normalizedType = type.toLowerCase(Locale.ROOT);
@@ -73,19 +95,12 @@ public final class MobColors {
                 try {
                     String value = pair[1].trim().replace("#", "").replace("0x", "").replace("0X", "");
                     return parseColor(value);
-                } catch (NumberFormatException ignored) {
-                    // Ignore one malformed custom entry and continue with defaults.
-                }
+                } catch (NumberFormatException ignored) {}
             }
         }
         return null;
     }
 
-    /**
-     * Uses the same ID and percentage rules as the HUD. A normal entity is
-     * allowed to mark a chunk only when one of those rules matches (or when
-     * it is below the purple ID limit).
-     */
     public static Integer chunkColor(int id, int maxId, MobOverlayConfig config) {
         Integer color = ruleColor(id, maxId, config.idColorRules, false);
         if (color != null) return color;
@@ -94,11 +109,6 @@ public final class MobColors {
         return id < config.purpleIdLimit ? config.purpleColor : null;
     }
 
-    public static float alpha(int color) {
-        return ((color >>> 24) & 255) / 255.0f;
-    }
-
-    /** Parses only RGB/ARGB values so malformed menu rules cannot poison colors. */
     private static int parseColor(String value) {
         if (value.length() != 6 && value.length() != 8) throw new NumberFormatException("color length");
         long parsed = Long.parseLong(value, 16);
