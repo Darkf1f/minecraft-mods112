@@ -425,7 +425,7 @@ public final class C2MEmod implements ClientModInitializer {
         if (sessionRow && mob.hurt() && config.pinHurtMobs) tags.append("[HURT*] ");
         if (mob.hostile()) tags.append("[HOSTILE] ");
         if (state.currentMaxId() > 0
-                && mob.id() * 100.0 / state.currentMaxId() < config.sessionPercentLimit) {
+            && mob.id() * 100.0 / state.currentMaxId() < config.sessionPercentLimit) {
             tags.append("[LOW_ID] ");
         }
         if (mob.player()) tags.append("[PLAYER] ");
