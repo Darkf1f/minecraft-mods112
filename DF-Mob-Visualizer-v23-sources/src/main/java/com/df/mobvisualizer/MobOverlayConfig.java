@@ -138,6 +138,13 @@ public final class MobOverlayConfig {
     public boolean alertHighlight = true;
     public boolean alertCenter = true;
 
+    // ===================== НОВЫЕ ПОЛЯ ДЛЯ ОТОБРАЖЕНИЯ ЧАНКОВ =====================
+    /** На сколько блоков выше поверхности (0.0 = на поверхности) */
+    public double chunkYOffset = 0.5;
+    /** Толщина слоя в блоках (1-10) */
+    public int chunkHeight = 1;
+    // =============================================================================
+
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FILE = FabricLoader.getInstance().getConfigDir()
             .resolve("df-mob-visualizer.json");
@@ -177,10 +184,27 @@ public final class MobOverlayConfig {
         chunkOpacity = Math.max(0.0f, Math.min(1.0f, chunkOpacity));
         chunkBorderOpacity = Math.max(0.0f, Math.min(1.0f, chunkBorderOpacity));
         chunkFillStrength = Math.max(0.1f, Math.min(3.0f, chunkFillStrength));
-        renderDistanceChunks = Math.max(1.0, renderDistanceChunks);
+        renderDistanceChunks = Math.max(1.0, Math.min(64.0, renderDistanceChunks));
+        hudX = Math.max(0, hudX);
+        hudY = Math.max(0, hudY);
+        if (pinnedEntityTypes == null) pinnedEntityTypes = "";
+        if (lowIdEntityTypes == null) lowIdEntityTypes = "";
+        if (highlightEntityTypes == null) highlightEntityTypes = "";
+        if (alertEntityTypes == null) alertEntityTypes = "";
+        if (alertSessionEntityTypes == null) alertSessionEntityTypes = "";
+        alertMode = alertMode == 1 ? 1 : 0;
+        alertGap = Math.max(0, alertGap);
+        alertPercent = clampPercent(alertPercent);
+        if (customMobColors == null) customMobColors = "";
+        if (chunkColorRules == null) chunkColorRules = "";
+        if (idColorRules == null) idColorRules = "";
+        if (percentColorRules == null) percentColorRules = "";
+        // НОВЫЕ НОРМАЛИЗАЦИИ
+        chunkYOffset = Math.max(0.0, Math.min(20.0, chunkYOffset));
+        chunkHeight = Math.max(1, Math.min(10, chunkHeight));
     }
 
-    private static double clampPercent(double v) {
-        return Math.max(0.0, Math.min(100.0, v));
+    private static double clampPercent(double value) {
+        return Math.max(0.0, Math.min(100.0, value));
     }
 }
