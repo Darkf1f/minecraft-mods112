@@ -13,11 +13,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Locale;
 import java.util.Set;
-import java.util.HashSet;
+import java.util.Locale;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -29,6 +29,7 @@ public final class MobOverlayState {
     private final Map<Integer, TrackedMob> mobs = new HashMap<>();
     private final Map<Integer, TrackedMob> session = new HashMap<>();
     private final Map<Long, ChunkMark> chunks = new HashMap<>();
+    private final Set<Integer> returnedIds = new HashSet<>();
     private int maxId;
     private int currentMaxId;
     private boolean sessionDirty;
@@ -63,32 +64,43 @@ public final class MobOverlayState {
 
     public synchronized void accept(TrackedMob mob) {
         mobs.put(mob.id(), mob);
+        
+        // Проверяем, был ли моб в сессии и вернулся ли
+        boolean wasInSession = session.containsKey(mob.id());
+        boolean isReturned = returnedIds.contains(mob.id());
+        
+        // Если моб был в returned и сейчас появился - он вернулся
+        if (isReturned) {
+            returnedIds.remove(mob.id());
+            if (config.returnedEnabled && matchesReturnedType(mob.type())) {
+                session.put(mob.id(), mob);
+                sessionDirty = true;
+            }
+        }
+        
+        // ALERT логика
         boolean explicitType = pinnedTypes().stream().anyMatch(type ->
                 mob.type().equalsIgnoreCase(type) || mob.type().toLowerCase(Locale.ROOT).endsWith(":" + type));
+        
         boolean pin = config.sessionEnabled
-                && ((config.pinLowIds && lowIdTypeAllowed(mob) && currentMaxId > 0
-                    && mob.id() * 100.0 / currentMaxId < config.sessionPercentLimit)
-                // A hit entity is always added to the session so it cannot
-                // disappear from the HUD just because a category toggle is off.
-                || (config.pinHurtMobs && mob.hurt())
-                || (config.pinHostileMobs && mob.hostile())
-                || (config.pinPlayers && mob.player())
-                || (config.alertPinSession && mob.alert() && alertSessionTypeAllowed(mob))
+                && ((config.alertEnabled && mob.alert() && config.alertAddToSession)
+                || (config.hurtEnabled && mob.hurt() && config.hurtAddToSession)
+                || (config.returnedEnabled && mob.returned() && config.returnedAddToSession)
                 || explicitType);
-        // Refresh an existing session entry whenever the mob is seen again,
-        // even if a setting changed while the chunk was unloaded.
+        
+        // Refresh an existing session entry whenever the mob is seen again
         if (pin || session.containsKey(mob.id())) {
             TrackedMob previous = session.put(mob.id(), mob);
             if (previous == null || !previous.equals(mob)) sessionDirty = true;
         }
+        
+        // Chunk marking
         Integer ruleColor = MobColors.chunkColor(mob.id(), currentMaxId, config);
         if (ruleColor == null) return;
         long key = chunkKey(mob.chunkX(), mob.chunkZ());
         ChunkMark old = chunks.get(key);
         int color = ruleColor;
         boolean alert = mob.alert() || (old != null && old.alert());
-        // A chunk keeps its most significant discovery color. A later ordinary
-        // entity must not downgrade a previously found low-ID/alert entity.
         if (old != null && !old.ring() && isMoreSignificant(old.color(), color)) {
             color = old.color();
         }
@@ -123,7 +135,7 @@ public final class MobOverlayState {
         if (config.hudSortMode == 1) {
             result.sort(Comparator.comparing(TrackedMob::type).thenComparingInt(TrackedMob::id));
         } else if (config.hudSortMode == 2) {
-            result.sort(Comparator.<TrackedMob>comparingInt(mob -> mob.player() ? 0 : mob.hostile() ? 1 : 2)
+            result.sort(Comparator.<TrackedMob>comparingInt(mob -> mob.player() ? 0 : 1)
                     .thenComparingInt(TrackedMob::id));
         } else {
             result.sort(Comparator.comparingInt(TrackedMob::id));
@@ -142,6 +154,10 @@ public final class MobOverlayState {
 
     public synchronized boolean isInSession(int id) {
         return session.containsKey(id);
+    }
+
+    public synchronized boolean isReturned(int id) {
+        return returnedIds.contains(id);
     }
 
     public synchronized Collection<TrackedMob> visibleSession() {
@@ -184,6 +200,7 @@ public final class MobOverlayState {
 
     public synchronized void clearSession() {
         session.clear();
+        returnedIds.clear();
         sessionDirty = false;
         saveSession();
     }
@@ -216,26 +233,18 @@ public final class MobOverlayState {
                 .collect(Collectors.toSet());
     }
 
-    private boolean lowIdTypeAllowed(TrackedMob mob) {
-        if (config.lowIdEntityTypes == null || config.lowIdEntityTypes.isBlank()) return true;
-        return Arrays.stream(config.lowIdEntityTypes.split(","))
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .filter(value -> !value.isBlank())
-                .map(value -> value.contains(":") ? value : "minecraft:" + value)
-                .anyMatch(value -> mob.type().equalsIgnoreCase(value));
-    }
-
-    private boolean alertSessionTypeAllowed(TrackedMob mob) {
-        if (config.alertSessionEntityTypes == null || config.alertSessionEntityTypes.isBlank()) {
-            return true;
+    private boolean matchesReturnedType(String type) {
+        if (config.returnedEntityTypes == null || config.returnedEntityTypes.isBlank()) return true;
+        String normalized = type.toLowerCase(Locale.ROOT);
+        for (String raw : config.returnedEntityTypes.split(",")) {
+            String wanted = raw.trim().toLowerCase(Locale.ROOT);
+            if (wanted.isBlank()) continue;
+            if (!wanted.contains(":")) wanted = "minecraft:" + wanted;
+            if (normalized.equals(wanted) || normalized.endsWith(":" + wanted.substring(wanted.indexOf(':') + 1))) {
+                return true;
+            }
         }
-        String mobType = mob.type().toLowerCase(Locale.ROOT);
-        return Arrays.stream(config.alertSessionEntityTypes.split(","))
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .filter(value -> !value.isBlank())
-                .map(value -> value.contains(":") ? value : "minecraft:" + value)
-                .anyMatch(value -> mobType.equals(value)
-                        || mobType.endsWith(":" + value.substring(value.indexOf(':') + 1)));
+        return false;
     }
 
     private static boolean isMoreSignificant(int oldColor, int newColor) {
