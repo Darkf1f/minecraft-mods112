@@ -62,6 +62,8 @@ public final class MobOverlayConfig {
     // ===== ALERT =====
     public boolean alertEnabled = true;
     public String alertEntityTypes = "minecraft:zombie, minecraft:creeper, minecraft:skeleton";
+    // per-mob override: if a mob is present here, it will always be added to session when alerted
+    public String alertSessionEntityTypes = "";
     public int alertMode = 0;
     public int alertGap = 100_000;
     public double alertPercent = 80.0;
@@ -78,6 +80,8 @@ public final class MobOverlayConfig {
     // ===== RETURNED =====
     public boolean returnedEnabled = true;
     public String returnedEntityTypes = "minecraft:zombie, minecraft:creeper, minecraft:skeleton";
+    // per-mob override for returned
+    public String returnedSessionEntityTypes = "";
     public boolean returnedAddToSession = true;
     public boolean returnedCenter = true;
     public boolean returnedHighlight = true;
@@ -98,6 +102,8 @@ public final class MobOverlayConfig {
     public boolean highlightRenamed = false;
     public boolean highlightPlayers = false;
     public boolean highlightAll = false;
+    // per-mob override for highlight
+    public String highlightSessionEntityTypes = "";
     
     // ===== ПОДСВЕТКА (СТАРАЯ ДЛЯ СОВМЕСТИМОСТИ) =====
     public boolean highlightSessionMobs = false;
@@ -114,6 +120,8 @@ public final class MobOverlayConfig {
     public boolean centerPlayers = false;
     // list of entity types for centering
     public String centerEntityTypes = "";
+    // per-mob override for center
+    public String centerSessionEntityTypes = "";
     
     // ===== ЦЕНТРИРОВАНИЕ (СТАРОЕ) =====
     public boolean centerSessionMobs = true;
@@ -208,6 +216,10 @@ public final class MobOverlayConfig {
         if (customMobColors == null) customMobColors = "";
         if (highlightEntityTypes == null) highlightEntityTypes = "";
         if (centerEntityTypes == null) centerEntityTypes = "";
+        if (alertSessionEntityTypes == null) alertSessionEntityTypes = "";
+        if (returnedSessionEntityTypes == null) returnedSessionEntityTypes = "";
+        if (highlightSessionEntityTypes == null) highlightSessionEntityTypes = "";
+        if (centerSessionEntityTypes == null) centerSessionEntityTypes = "";
     }
 
     private static double clampPercent(double value) {
