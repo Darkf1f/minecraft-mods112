@@ -21,9 +21,6 @@ import java.util.Locale;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-/**
- * Holds live and persisted observations independently from the HUD.
- */
 public final class MobOverlayState {
     private final MobOverlayConfig config;
     private final Map<Integer, TrackedMob> mobs = new HashMap<>();
@@ -49,10 +46,6 @@ public final class MobOverlayState {
         loadMaxId();
     }
 
-    /**
-     * Live entities are rebuilt on every scan. Chunk marks are deliberately
-     * kept separately because they represent the persistent discovery history.
-     */
     public synchronized void beginLiveScan(int currentMaxId) {
         mobs.clear();
         this.currentMaxId = currentMaxId;
@@ -65,11 +58,9 @@ public final class MobOverlayState {
     public synchronized void accept(TrackedMob mob) {
         mobs.put(mob.id(), mob);
         
-        // Проверяем, был ли моб в сессии и вернулся ли
         boolean wasInSession = session.containsKey(mob.id());
         boolean isReturned = returnedIds.contains(mob.id());
         
-        // Если моб был в returned и сейчас появился - он вернулся
         if (isReturned) {
             returnedIds.remove(mob.id());
             if (config.returnedEnabled && matchesReturnedType(mob.type())) {
@@ -78,7 +69,6 @@ public final class MobOverlayState {
             }
         }
         
-        // ALERT логика
         boolean explicitType = pinnedTypes().stream().anyMatch(type ->
                 mob.type().equalsIgnoreCase(type) || mob.type().toLowerCase(Locale.ROOT).endsWith(":" + type));
         
@@ -88,13 +78,11 @@ public final class MobOverlayState {
                 || (config.returnedEnabled && mob.returned() && config.returnedAddToSession)
                 || explicitType);
         
-        // Refresh an existing session entry whenever the mob is seen again
         if (pin || session.containsKey(mob.id())) {
             TrackedMob previous = session.put(mob.id(), mob);
             if (previous == null || !previous.equals(mob)) sessionDirty = true;
         }
         
-        // Chunk marking
         Integer ruleColor = MobColors.chunkColor(mob.id(), currentMaxId, config);
         if (ruleColor == null) return;
         long key = chunkKey(mob.chunkX(), mob.chunkZ());
