@@ -136,13 +136,13 @@ public final class MobSettingsScreenV2 extends Screen {
         toggle(left, 140, "Подсвечивать через стены", config.hurtHighlight, () -> config.hurtHighlight = !config.hurtHighlight);
         
         button(left, 165, 150, "Цвет HURT: " + hex(config.hurtColor),
-                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, config, config.hurtColor, color -> {
+                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, "HURT", config.hurtColor, color -> {
                     config.hurtColor = color;
                     save();
                     init();
                 })));
         button(left + 160, 165, 150, "Цвет HURT*: " + hex(config.hurtStarColor),
-                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, config, config.hurtStarColor, color -> {
+                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, "HURT*", config.hurtStarColor, color -> {
                     config.hurtStarColor = color;
                     save();
                     init();
@@ -226,7 +226,7 @@ public final class MobSettingsScreenV2 extends Screen {
                 b -> { config.chunkFillStrength = nextStrength(config.chunkFillStrength); save(); init(); });
         button(left, 240, 310, "Граница: " + percent(config.chunkBorderOpacity),
                 b -> { config.chunkBorderOpacity = nextOpacity(config.chunkBorderOpacity); save(); init(); });
-        toggle(left, 265, 310, "Игроки в HUD", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
+        toggle(left, 265, "Игроки в HUD", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
         button(left, 290, 310, "Сбросить позицию HUD", b -> { config.hudX = 8; config.hudY = 8; save(); });
     }
 
