@@ -136,13 +136,13 @@ public final class MobSettingsScreenV2 extends Screen {
         toggle(left, 140, "Подсвечивать через стены", config.hurtHighlight, () -> config.hurtHighlight = !config.hurtHighlight);
         
         button(left, 165, 150, "Цвет HURT: " + hex(config.hurtColor),
-                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, config.hurtColor, color -> {
+                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, config, config.hurtColor, color -> {
                     config.hurtColor = color;
                     save();
                     init();
                 })));
         button(left + 160, 165, 150, "Цвет HURT*: " + hex(config.hurtStarColor),
-                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, config.hurtStarColor, color -> {
+                b -> MinecraftClient.getInstance().setScreen(new MobColorPickerScreen(this, config, config.hurtStarColor, color -> {
                     config.hurtStarColor = color;
                     save();
                     init();
@@ -192,11 +192,6 @@ public final class MobSettingsScreenV2 extends Screen {
         toggle(left, 115, "Игроки в HUD", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
         toggle(left, 140, "Другие сущности", config.includeOtherEntities, () -> config.includeOtherEntities = !config.includeOtherEntities);
         toggle(left, 165, "Сохранять сессию", config.persistSession, () -> config.persistSession = !config.persistSession);
-        button(left, 190, 310, "Типы для сессии (вручную)", b -> {
-            // Открываем экран выбора мобов для сессии
-            page = "session_types";
-            init();
-        });
     }
 
     private void buildIdColors(int left) {
@@ -236,10 +231,6 @@ public final class MobSettingsScreenV2 extends Screen {
     }
 
     private void buildColors(int left) {
-        // Список мобов с цветами (как в оригинале)
-        page = "colors_list";
-        // Здесь можно вызвать существующий метод из старой версии
-        // или оставить заглушку
         button(left, 65, 310, "← Назад к разделам", b -> open("main"));
     }
 
