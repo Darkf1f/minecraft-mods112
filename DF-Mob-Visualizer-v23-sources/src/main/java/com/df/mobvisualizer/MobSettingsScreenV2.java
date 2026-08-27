@@ -183,14 +183,21 @@ public final class MobSettingsScreenV2 extends Screen {
                 () -> config.showChunkOverlay = !config.showChunkOverlay);
         toggle(left, 140, "Показывать заливку чанков", config.showChunkFill,
                 () -> config.showChunkFill = !config.showChunkFill);
-        button(left, 165, 310, "Прозрачность поверхности: " + percent(config.chunkOpacity),
+        
+        button(left, 165, 150, "Высота слоя: " + config.chunkYOffset + " блоков",
+                b -> MinecraftClient.getInstance().setScreen(new HeightInputScreen(this, config, true)));
+        
+        button(left + 160, 165, 150, "Толщина: " + config.chunkHeight + " блок(ов)",
+                b -> MinecraftClient.getInstance().setScreen(new HeightInputScreen(this, config, false)));
+        
+        button(left, 190, 310, "Прозрачность поверхности: " + percent(config.chunkOpacity),
                 b -> { config.chunkOpacity = nextOpacity(config.chunkOpacity); save(); init(); });
-        button(left, 190, 310, "Усиление заливки: " + String.format(Locale.ROOT, "%.1fx", config.chunkFillStrength),
+        button(left, 215, 310, "Усиление заливки: " + String.format(Locale.ROOT, "%.1fx", config.chunkFillStrength),
                 b -> { config.chunkFillStrength = nextStrength(config.chunkFillStrength); save(); init(); });
-        button(left, 215, 310, "Прозрачность границы: " + percent(config.chunkBorderOpacity),
+        button(left, 240, 310, "Прозрачность границы: " + percent(config.chunkBorderOpacity),
                 b -> { config.chunkBorderOpacity = nextOpacity(config.chunkBorderOpacity); save(); init(); });
-        toggle(left, 240, "Показывать игроков", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
-        button(left, 270, 310, "Сбросить позицию HUD", b -> { config.hudX = 8; config.hudY = 8; save(); });
+        toggle(left, 265, 310, "Показывать игроков", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
+        button(left, 290, 310, "Сбросить позицию HUD", b -> { config.hudX = 8; config.hudY = 8; save(); });
     }
 
     private static String percent(float value) {
