@@ -10,10 +10,10 @@ public record TrackedMob(
         boolean alert,
         int color,
         boolean player,
-        boolean hostile,
         boolean hurt,
         boolean chargedCreeper,
-        boolean renamed
+        boolean renamed,
+        boolean returned
 ) {
     public int chunkX() {
         return x >> 4;
