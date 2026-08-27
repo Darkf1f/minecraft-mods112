@@ -32,16 +32,16 @@ public final class HeightInputScreen extends Screen {
         inputField = new TextFieldWidget(textRenderer, centerX, centerY, 150, 20, Text.literal("Введите число"));
         inputField.setText(currentValue);
         inputField.setMaxLength(10);
-        inputField.setPlaceholder(Text.literal(isHeight ? "0.0 - 20.0" : "1 - 10"));
+        inputField.setPlaceholder(Text.literal(isHeight ? "-10.0 до 200.0" : "0.0 до 50.0"));
         addDrawableChild(inputField);
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Сохранить"), button -> {
             try {
                 double value = Double.parseDouble(inputField.getText().trim());
                 if (isHeight) {
-                    config.chunkYOffset = Math.max(0.0, Math.min(20.0, value));
+                    config.chunkYOffset = Math.max(-10.0, Math.min(200.0, value));
                 } else {
-                    config.chunkHeight = (int) Math.max(1, Math.min(10, Math.round(value)));
+                    config.chunkHeight = Math.max(0.0, Math.min(50.0, value));
                 }
                 config.save();
                 MinecraftClient.getInstance().setScreen(parent);
@@ -55,8 +55,8 @@ public final class HeightInputScreen extends Screen {
         }).dimensions(centerX + 80, centerY + 25, 70, 20).build());
 
         addDrawableChild(ButtonWidget.builder(
-            Text.literal(isHeight ? "Высота: 0.0 (на земле) - 20.0 (в воздухе)" 
-                                  : "Толщина: 1 (плоский) - 10 (объёмный)"),
+            Text.literal(isHeight ? "Высота: -10 (под землёй) до 200 (в воздухе)" 
+                                  : "Толщина: 0 (плоский) до 50 (объёмный)"),
             button -> {}
         ).dimensions(centerX, centerY + 50, 150, 20).build());
     }
