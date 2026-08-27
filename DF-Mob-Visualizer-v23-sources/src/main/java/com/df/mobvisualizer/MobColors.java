@@ -7,42 +7,27 @@ public final class MobColors {
 
     public static int forEntity(String type, int id, int maxId, MobOverlayConfig config,
                                  boolean hurt, boolean returned, boolean alert) {
-        // 1. ALERT цвет (если моб ALERT)
         if (alert && config.alertEnabled) {
-            return 0xFFFFD34E; // жёлтый
+            return 0xFFFFD34E;
         }
-        
-        // 2. HURT цвет (если моб сейчас ранен)
         if (hurt && config.hurtEnabled) {
             return config.hurtColor;
         }
-        
-        // 3. RETURNED цвет (если моб вернулся)
         if (returned && config.returnedEnabled) {
-            return 0xFFFFAA00; // оранжевый
+            return config.hurtStarColor;
         }
-        
-        // 4. Индивидуальный цвет моба
         Integer custom = customColor(type, config);
         if (custom != null) return custom;
-        
-        // 5. Цвет по ID/проценту
         return forId(id, maxId, config);
     }
 
     public static int forId(int id, int maxId, MobOverlayConfig config) {
-        // ID правила
         Integer ruleColor = ruleColor(id, maxId, config.idColorRules, false);
         if (ruleColor != null) return ruleColor;
-        
-        // Процент правила
         ruleColor = ruleColor(id, maxId, config.percentColorRules, true);
         if (ruleColor != null) return ruleColor;
-        
-        // Стандартные цвета
         if (id < config.purpleIdLimit) return config.purpleColor;
         if (maxId <= 0) return config.orangeColor;
-        
         double percent = id * 100.0 / maxId;
         if (percent < config.darkRedPercent) return config.darkRedColor;
         if (percent < config.redPercent) return config.redColor;
