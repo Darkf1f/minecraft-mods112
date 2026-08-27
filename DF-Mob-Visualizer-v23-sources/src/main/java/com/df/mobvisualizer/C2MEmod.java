@@ -297,20 +297,6 @@ public final class C2MEmod implements ClientModInitializer {
         return false;
     }
 
-    private boolean matchesReturnedType(String type) {
-        if (config.returnedEntityTypes == null || config.returnedEntityTypes.isBlank()) return true;
-        String normalized = type.toLowerCase(Locale.ROOT);
-        for (String raw : config.returnedEntityTypes.split(",")) {
-            String wanted = raw.trim().toLowerCase(Locale.ROOT);
-            if (wanted.isBlank()) continue;
-            if (!wanted.contains(":")) wanted = "minecraft:" + wanted;
-            if (normalized.equals(wanted) || normalized.endsWith(":" + wanted.substring(wanted.indexOf(':') + 1))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private boolean centerMatches(TrackedMob mob) {
         if (config.centerAlertMobs && mob.alert()) return true;
         if (config.centerReturnedMobs && mob.returned()) return true;
@@ -372,7 +358,6 @@ public final class C2MEmod implements ClientModInitializer {
                 if (!shouldHighlight(mob)) continue;
                 if (!isBehindBlock(client, entity, cameraPos)) continue;
                 
-                // Рисуем МОДЕЛЬ моба (через стены)
                 context.matrixStack().push();
                 try {
                     dispatcher.render(entity, 
@@ -387,7 +372,6 @@ public final class C2MEmod implements ClientModInitializer {
                     context.matrixStack().pop();
                 }
                 
-                // Хитбокс (запасной вариант)
                 drawEntityBox(wallLines, entity, cameraPos, color, 0.95f);
             }
         } finally {
@@ -431,10 +415,7 @@ public final class C2MEmod implements ClientModInitializer {
         
         try {
             RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugFilledQuads());
-            if (fills == null) {
-                fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
-            }
+            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
             
             refreshSurfaceCache(client);
             Map<Long, Integer> chunkHeights = new HashMap<>();
