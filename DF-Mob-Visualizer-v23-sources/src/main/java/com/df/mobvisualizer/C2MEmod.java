@@ -320,11 +320,9 @@ public final class C2MEmod implements ClientModInitializer {
         
         try {
             RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugFilledQuads());
-            if (fills == null) {
-                fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
-            }
-            
+            // Use DebugQuads directly — some mappings don't provide getDebugFilledQuads()
+            VertexConsumer fills = context.consumers().getBuffer(RenderLayer.getDebugQuads());
+
             Map<Long, Integer> chunkHeights = new HashMap<>();
             
             for (ChunkMark mark : state.visibleChunks()) {

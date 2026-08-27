@@ -196,7 +196,8 @@ public final class MobSettingsScreenV2 extends Screen {
                 b -> { config.chunkFillStrength = nextStrength(config.chunkFillStrength); save(); init(); });
         button(left, 240, 310, "Прозрачность границы: " + percent(config.chunkBorderOpacity),
                 b -> { config.chunkBorderOpacity = nextOpacity(config.chunkBorderOpacity); save(); init(); });
-        toggle(left, 265, 310, "Показывать игроков", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
+        // Fixed: remove stray width int (310) passed into toggle — toggle signature is (x,y,label,value,action)
+        toggle(left, 265, "Показывать игроков", config.showPlayers, () -> config.showPlayers = !config.showPlayers);
         button(left, 290, 310, "Сбросить позицию HUD", b -> { config.hudX = 8; config.hudY = 8; save(); });
     }
 
